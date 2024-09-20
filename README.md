@@ -10,5 +10,3 @@ Use avocado to make dino bigger and get more score
 If onscreen have more than 12 point, u loose
 If time over u loose, get chase to increase time
 
-Link TEST:
-https://rawcdn.githack.com/Koda1412/Purus_Dino_Chase/bda9902f103a47033baa92ef4d9ab11ed36aadd3/PURUSGame.html
