@@ -58,11 +58,11 @@
         redDinoImage.src = './DinoSprites - mort.png';
         bombImage.src = './Bomb.png';
         avocadoImage.src = './Avocado.png';
-        bombAVImageA.src = './StatusA.png';
-        bombAVImageB.src = './StatusB.png';
-        bombAVImageC.src = './StatusC.png';
-        bombAVImageD.src = './StatusD.png';
-        bombAVImageE.src = './StatusE.png';
+        bombAVImageA.src = './StatusBarA.png';
+        bombAVImageB.src = './StatusBarB.png';
+        bombAVImageC.src = './StatusBarC.png';
+        bombAVImageD.src = './StatusBarD.png';
+        bombAVImageE.src = './StatusBarE.png';
 
         yellowDinoImage.onload = function() {
         console.log('Yellow Dino Image loaded');
@@ -1992,11 +1992,16 @@ function gameLoop(timeStamp) {
     context.fillText('Score: ' + score, 10, 30);
     context.fillText('Dino left: ' + (maxObjects - objectCount), 10, 60);
     context.fillText(text, 310,25);
+    if (bombValue>=4){
+        context.font = '10px Comic Sans MS';
+        context.fillText('Press > to use Bomb', 152, 55);
+    }
+    
     if (time > 30 ) {
         context.fillStyle = 'red';
         context.font = '22px Comic Sans MS';
         context.fillText('Time Left: ' + (40 - time), 10, 80);
-    } else if (time < 30 ) {
+    } else if (time <= 30 ) {
         context.fillStyle = 'black';
         context.font = '20px Comic Sans MS';
         context.fillText('Time Left: ' + (40 - time), 10, 80);
@@ -2004,15 +2009,15 @@ function gameLoop(timeStamp) {
 
     // Draw the bombAVImage
     if (bombValue == 0) { // Change condition based on your logic
-    context.drawImage(bombAVImageA, 200, 20, 40, 40);
+    context.drawImage(bombAVImageA, 150, 20, 100, 20);
     } else if (bombValue == 1) { // Change condition based on your logic
-    context.drawImage(bombAVImageB, 200, 20, 40, 40);
+    context.drawImage(bombAVImageB, 150, 20, 100, 20);
     } else if (bombValue == 2) { // Change condition based on your logic
-    context.drawImage(bombAVImageC, 200, 20, 40, 40);
+    context.drawImage(bombAVImageC, 150, 20, 100, 20);
     } else if (bombValue == 3) { // Change condition based on your logic
-    context.drawImage(bombAVImageD, 200, 20, 40, 40);
+    context.drawImage(bombAVImageD, 150, 20, 100, 20);
     } else if (bombValue >= 4) { // Change condition based on your logic
-    context.drawImage(bombAVImageE, 200, 20, 40, 40);
+    context.drawImage(bombAVImageE, 150, 20, 100, 20);
     } 
 
     // Draw the current dino type animation
