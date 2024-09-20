@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PurusGame</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;  /* Centers horizontally */
+            align-items: center;      /* Centers vertically */
+        }
+        canvas { display: block; background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="750" style="border: 2px solid black;"></canvas>
+    <script>
+        const g = 10000;
+        const canvasWidth = 400;
+        const canvasHeight = 750;
+        const restitution = 0.5;
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        let gameObjects = [];
+        let oldTimeStamp = 0;
+        let time = 0;
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('highScore')) || 0;
+        let objectCount = 0;
+        let bombValue = 0;
+        const maxObjects = 12;
+        let isGameOver = false;
+        const dinoTypes = ['dinoT', 'dinoV', 'dinoD', 'dinoM', 'avocado', 'bomb'];
+        const dinoNames = ['Yellow', 'Green', 'Blue', 'Red', 'Avocado', 'Bomb'];
+        let currentIndex = 0;
+        let selectedObjectType = dinoTypes[currentIndex];
+        let text = dinoNames[currentIndex];
+        // Create image objects
+        const yellowDinoImage = new Image();
+        const greenDinoImage = new Image();
+        const blueDinoImage = new Image();
+        const redDinoImage = new Image();
+        const bombImage = new Image();
+        const avocadoImage = new Image();
+        const bombAVImageA = new Image();
+        const bombAVImageB = new Image();
+        const bombAVImageC = new Image();
+        const bombAVImageD = new Image();
+        const bombAVImageE = new Image();
+ 
+        yellowDinoImage.src = './DinoSprites - tard.png';
+        greenDinoImage.src = './DinoSprites - vita.png';
+        blueDinoImage.src = './DinoSprites - doux.png';
+        redDinoImage.src = './DinoSprites - mort.png';
+        bombImage.src = './Bomb.png';
+        avocadoImage.src = './Avocado.png';
+        bombAVImageA.src = './StatusA.png';
+        bombAVImageB.src = './StatusB.png';
+        bombAVImageC.src = './StatusC.png';
+        bombAVImageD.src = './StatusD.png';
+        bombAVImageE.src = './StatusE.png';
+
+        yellowDinoImage.onload = function() {
+        console.log('Yellow Dino Image loaded');
+        };
+
+        greenDinoImage.onload = function() {
+        console.log('Green Dino Image loaded');
+        };
+
+        blueDinoImage.onload = function() {
+        console.log('Blue Dino Image loaded');
+        };
+
+        redDinoImage.onload = function() {
+        console.log('Red Dino Image loaded');
+        };
+
+        bombImage.onload = function() {
+        console.log('Bomb Image loaded');
+        };
+
+        avocadoImage.onload = function() {
+        console.log('Avocado Image loaded');
+        };
+
+        bombAVImageA.onload = function() {
+        console.log('Bomb Status Bar Image loaded');
+        };
+
+        bombAVImageB.onload = function() {
+        console.log('Bomb Status Bar Image loaded');
+        };
+
+        bombAVImageC.onload = function() {
+        console.log('Bomb Status Bar Image loaded');
+        };
+
+        bombAVImageD.onload = function() {
+        console.log('Bomb Status Bar Image loaded');
+        };
+
+        bombAVImageE.onload = function() {
+        console.log('Bomb Status Bar Image loaded');
+        };
+
+        const backgroundImage = new Image();
+        backgroundImage.src = './backgr2.png';
+        const backgroundImage2 = new Image();
+        backgroundImage2.src = './backgr3.png';
+        const backgroundImage3 = new Image();
+        backgroundImage3.src = './backgr.jpg';
+        let currentBackgroundImage = backgroundImage; 
+        backgroundImage.onload = function() {
+        resetGame();
+        };
+
+ 
+    window.addEventListener('keydown', function(event) {
+    if (event.key === 'ArrowUp') {
+        // Move up in the list (cycle only through the first 4 elements)
+        currentIndex = (currentIndex === 0) ? 3 : currentIndex - 1;
+    } else if (event.key === 'ArrowDown') {
+        // Move down in the list (cycle only through the first 4 elements)
+        currentIndex = (currentIndex === 3) ? 0 : currentIndex + 1;
+    } else if (event.key === 'ArrowRight') {
+        // Select bomb if 'ArrowRight' is pressed
+        selectedObjectType = 'bomb';
+        text = 'Bomb';
+        console.log(`${text} is now selected`);
+    } else if (event.key === 'ArrowLeft') {
+        // Select avocado if 'ArrowLeft' is pressed
+        selectedObjectType = 'avocado';
+        text = 'Avocado';
+        console.log(`${text} is now selected`);
+    }
+
+    // Update selection if arrow keys are pressed (only for the first 4 elements)
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        selectedObjectType = dinoTypes[currentIndex];
+        text = dinoNames[currentIndex];
+        console.log(`${text} selected`);
+    }
+
+    // Bomb restriction logic
+    if (selectedObjectType === 'bomb' && bombValue < 4) {
+        console.log('Bomb can’t be used.');
+        currentIndex = 0;  // Force back to the first valid index (Yellow Dino)
+        selectedObjectType = dinoTypes[currentIndex];
+        text = dinoNames[currentIndex];
+    }
+
+    // Avocado restriction logic
+    if (selectedObjectType === 'avocado' && score < 30) {
+        console.log('Avocado can’t be used.');
+        currentIndex = 0;  // Force back to the first valid index (Yellow Dino)
+        selectedObjectType = dinoTypes[currentIndex];
+        text = dinoNames[currentIndex];
+    }
+});
+
+        
+let lastClickTime = 0; // Track the last time a click was registered
+const clickCooldown = 1500; // Cooldown period in milliseconds (1500 ms = 1,5 seconds)
+
+canvas.addEventListener('click', function(event) {
+    if (isGameOver) return;
+
+    const currentTime = Date.now();
+    if (currentTime - lastClickTime < clickCooldown) {
+        return; // If the time since the last click is less than the cooldown, ignore this click
+    }
+
+    lastClickTime = currentTime; // Update the last click time
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = 40;
+    const vx = 0;
+    const vy = 100;
+    const radius = 40
+
+    if (selectedObjectType === 'dinoV') {
+        gameObjects.push(new SpriteV(x, y, vx, vy, restitution, radius));
+    } else if (selectedObjectType === 'dinoT') {
+        gameObjects.push(new SpriteT(x, y, vx, vy, restitution, radius));
+    } else if (selectedObjectType === 'dinoD') {
+        gameObjects.push(new SpriteD(x, y, vx, vy, restitution, radius));
+    } else if (selectedObjectType === 'dinoM') {
+        gameObjects.push(new SpriteM(x, y, vx, vy, restitution, radius));
+    } else if (selectedObjectType === 'avocado') {
+        gameObjects.push(new Avocado(x, y, vx, vy, restitution, 25));
+        score -= 30;
+        selectedObjectType = 'dinoT';
+        text = 'Yellow';
+    } else if (selectedObjectType === 'bomb') {
+        gameObjects.push(new Bomb(x, y, vx, vy, restitution, radius));
+        selectedObjectType = 'dinoT';
+        text = 'Yellow';
+    }
+
+    objectCount++;
+
+    if (objectCount >= maxObjects) {
+        gameOver();
+    }
+});
+
+
+        function clearCanvas() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        class GameObject {
+            constructor(x, y, vx, vy, restitution, radius) {
+                this.x = x;
+                this.radius = radius;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.restitution = restitution;
+                this.isColliding = false;
+            }
+            draw() {}
+            update(secondsPassed) {}
+        }
+        
+    class Avocado extends GameObject {
+    static numColumns = 1;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'avocado';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!Avocado.sprite) {
+            Avocado.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            Avocado.sprite.onload = () => {
+                Avocado.frameWidth = Avocado.sprite.width / Avocado.numColumns;
+                Avocado.frameHeight = Avocado.sprite.height / Avocado.numRows;
+            };
+
+            // Start loading the image
+            Avocado.sprite.src = './Avocado.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!Avocado.sprite || !Avocado.frameWidth || !Avocado.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % Avocado.numColumns;
+        const row = Math.floor(this.currentFrame / Avocado.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            Avocado.sprite,
+            column * Avocado.frameWidth,
+            row * Avocado.frameHeight,
+            Avocado.frameWidth,
+            Avocado.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (Avocado.numColumns * Avocado.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}    
+
+
+    class Bone extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'bone';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!Bone.sprite) {
+            Bone.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            Bone.sprite.onload = () => {
+                Bone.frameWidth = Bone.sprite.width / Bone.numColumns;
+                Bone.frameHeight = Bone.sprite.height / Bone.numRows;
+            };
+
+            // Start loading the image
+            Bone.sprite.src = './DinoSprites - cloud.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!Bone.sprite || !Bone.frameWidth || !Bone.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % Bone.numColumns;
+        const row = Math.floor(this.currentFrame / Bone.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            Bone.sprite,
+            column * Bone.frameWidth,
+            row * Bone.frameHeight,
+            Bone.frameWidth,
+            Bone.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (Bone.numColumns * Bone.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}    
+
+class SpriteVB extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoVB';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteVB.sprite) {
+            SpriteVB.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteVB.sprite.onload = () => {
+                SpriteVB.frameWidth = SpriteVB.sprite.width / SpriteVB.numColumns;
+                SpriteVB.frameHeight = SpriteVB.sprite.height / SpriteVB.numRows;
+            };
+
+            // Start loading the image
+            SpriteVB.sprite.src = './DinoSprites - vita.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteVB.sprite || !SpriteVB.frameWidth || !SpriteVB.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteVB.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteVB.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteVB.sprite,
+            column * SpriteVB.frameWidth,
+            row * SpriteVB.frameHeight,
+            SpriteVB.frameWidth,
+            SpriteVB.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteVB.numColumns * SpriteVB.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+
+    class SpriteV extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoV';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteV.sprite) {
+            SpriteV.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteV.sprite.onload = () => {
+                SpriteV.frameWidth = SpriteV.sprite.width / SpriteV.numColumns;
+                SpriteV.frameHeight = SpriteV.sprite.height / SpriteV.numRows;
+            };
+
+            // Start loading the image
+            SpriteV.sprite.src = './DinoSprites - vita.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteV.sprite || !SpriteV.frameWidth || !SpriteV.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteV.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteV.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteV.sprite,
+            column * SpriteV.frameWidth,
+            row * SpriteV.frameHeight,
+            SpriteV.frameWidth,
+            SpriteV.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteV.numColumns * SpriteV.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+class Bomb extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'bomb';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!Bomb.sprite) {
+            Bomb.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            Bomb.sprite.onload = () => {
+                Bomb.frameWidth = Bomb.sprite.width / Bomb.numColumns;
+                Bomb.frameHeight = Bomb.sprite.height / Bomb.numRows;
+            };
+
+            // Start loading the image
+            Bomb.sprite.src = './Bomb.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!Bomb.sprite || !Bomb.frameWidth || !Bomb.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % Bomb.numColumns;
+        const row = Math.floor(this.currentFrame / Bomb.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            Bomb.sprite,
+            column * Bomb.frameWidth,
+            row * Bomb.frameHeight,
+            Bomb.frameWidth,
+            Bomb.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (Bomb.numColumns * Bomb.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+
+class SpriteD extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoD';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteD.sprite) {
+            SpriteD.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteD.sprite.onload = () => {
+                SpriteD.frameWidth = SpriteD.sprite.width / SpriteD.numColumns;
+                SpriteD.frameHeight = SpriteD.sprite.height / SpriteD.numRows;
+            };
+
+            // Start loading the image
+            SpriteD.sprite.src = './DinoSprites - doux.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteD.sprite || !SpriteD.frameWidth || !SpriteD.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteD.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteD.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteD.sprite,
+            column * SpriteD.frameWidth,
+            row * SpriteD.frameHeight,
+            SpriteD.frameWidth,
+            SpriteD.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteD.numColumns * SpriteD.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+
+class SpriteDB extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoDB';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteDB.sprite) {
+            SpriteDB.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteDB.sprite.onload = () => {
+                SpriteDB.frameWidth = SpriteDB.sprite.width / SpriteDB.numColumns;
+                SpriteDB.frameHeight = SpriteDB.sprite.height / SpriteDB.numRows;
+            };
+
+            // Start loading the image
+            SpriteDB.sprite.src = './DinoSprites - doux.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteDB.sprite || !SpriteDB.frameWidth || !SpriteDB.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteDB.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteDB.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteDB.sprite,
+            column * SpriteDB.frameWidth,
+            row * SpriteDB.frameHeight,
+            SpriteDB.frameWidth,
+            SpriteDB.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteDB.numColumns * SpriteDB.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+class SpriteM extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoM';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteM.sprite) {
+            SpriteM.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteM.sprite.onload = () => {
+                SpriteM.frameWidth = SpriteM.sprite.width / SpriteM.numColumns;
+                SpriteM.frameHeight = SpriteM.sprite.height / SpriteM.numRows;
+            };
+
+            // Start loading the image
+            SpriteM.sprite.src = './DinoSprites - mort.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteM.sprite || !SpriteM.frameWidth || !SpriteM.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteM.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteM.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteM.sprite,
+            column * SpriteM.frameWidth,
+            row * SpriteM.frameHeight,
+            SpriteM.frameWidth,
+            SpriteM.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteM.numColumns * SpriteM.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+class SpriteMB extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoMB';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteMB.sprite) {
+            SpriteMB.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteMB.sprite.onload = () => {
+                SpriteMB.frameWidth = SpriteMB.sprite.width / SpriteMB.numColumns;
+                SpriteMB.frameHeight = SpriteMB.sprite.height / SpriteMB.numRows;
+            };
+
+            // Start loading the image
+            SpriteMB.sprite.src = './DinoSprites - mort.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteMB.sprite || !SpriteMB.frameWidth || !SpriteMB.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteMB.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteMB.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteMB.sprite,
+            column * SpriteMB.frameWidth,
+            row * SpriteMB.frameHeight,
+            SpriteMB.frameWidth,
+            SpriteMB.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteMB.numColumns * SpriteMB.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+
+class SpriteT extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoT';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteT.sprite) {
+            SpriteT.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteT.sprite.onload = () => {
+                SpriteT.frameWidth = SpriteT.sprite.width / SpriteT.numColumns;
+                SpriteT.frameHeight = SpriteT.sprite.height / SpriteT.numRows;
+            };
+
+            // Start loading the image
+            SpriteT.sprite.src = './DinoSprites - tard.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteT.sprite || !SpriteT.frameWidth || !SpriteT.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteT.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteT.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteT.sprite,
+            column * SpriteT.frameWidth,
+            row * SpriteT.frameHeight,
+            SpriteT.frameWidth,
+            SpriteT.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteT.numColumns * SpriteT.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+class SpriteTB extends GameObject {
+    static numColumns = 24;
+    static numRows = 1;
+    static frameWidth = 0;
+    static frameHeight = 0;
+    static sprite = null;
+
+    constructor(x, y, vx, vy, restitution, radius) {
+        super(x, y, vx, vy, restitution, radius);
+        this.type = 'dinoTB';
+        this.currentFrame = 0;
+        this.frameSpeed = 10; // Adjust the speed of the frame changes
+        this.frameCounter = 0;
+
+        // Load the sprite image if not loaded already
+        this.loadImage();
+    }
+
+    loadImage() {
+        if (!SpriteTB.sprite) {
+            SpriteTB.sprite = new Image();
+
+            // Define the size of a frame when the image loads
+            SpriteTB.sprite.onload = () => {
+                SpriteTB.frameWidth = SpriteTB.sprite.width / SpriteTB.numColumns;
+                SpriteTB.frameHeight = SpriteTB.sprite.height / SpriteTB.numRows;
+            };
+
+            // Start loading the image
+            SpriteTB.sprite.src = './DinoSprites - tard.png';
+        }
+    }
+
+    draw(context) {
+        // Ensure image has loaded before drawing
+        if (!SpriteTB.sprite || !SpriteTB.frameWidth || !SpriteTB.frameHeight) return;
+
+        // Calculate the row and column based on the current frame number
+        const column = this.currentFrame % SpriteTB.numColumns;
+        const row = Math.floor(this.currentFrame / SpriteTB.numColumns);
+
+        // Draw the current sprite frame
+        context.drawImage(
+            SpriteTB.sprite,
+            column * SpriteTB.frameWidth,
+            row * SpriteTB.frameHeight,
+            SpriteTB.frameWidth,
+            SpriteTB.frameHeight,
+            this.x - this.radius,
+            this.y - this.radius,
+            this.radius * 2,
+            this.radius * 2.42 // Adjust height scaling to match sprite proportions
+        );
+    }
+
+    update(secondsPassed) {
+        this.vy += g * secondsPassed;
+        this.x += this.vx * secondsPassed;
+        this.y += this.vy * secondsPassed;
+
+        // Increment frame counter to control animation speed
+        this.frameCounter += secondsPassed * this.frameSpeed;
+        if (this.frameCounter >= 1) {
+            this.currentFrame = (this.currentFrame + 1) % (SpriteTB.numColumns * SpriteTB.numRows); // Loop through frames
+            this.frameCounter = 0;
+        }
+
+        detectEdgeCollisions(this);
+    }
+
+    handleCollision() {
+        // You can also trigger animation changes here if needed
+    }
+}
+
+const collisionSound = new Audio('./mouse-click.mp3'); 
+collisionSound.volume = 0.5;
+const autoGeneSound = new Audio('./pillow-hit.mp3'); 
+autoGeneSound.volume = 1;
+const loopSound = new Audio('./game.mp3'); 
+loopSound.volume = 0.5; // Adjust volume as needed
+loopSound.loop = true;
+
+function detectCollisions() {
+    // Reset collision status for all objects
+    for (let i = 0; i < gameObjects.length; i++) {
+        gameObjects[i].isColliding = false;
+    }
+
+    for (let i = 0; i < gameObjects.length; i++) {
+        for (let j = i + 1; j < gameObjects.length; j++) {
+            let obj1 = gameObjects[i];
+            let obj2 = gameObjects[j];
+
+            // Handle Different object collision (No disappearing, No bonus score)
+            // Normal Object
+            if ((obj1 instanceof SpriteT && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof SpriteT) 
+            || (obj1 instanceof SpriteT && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof SpriteT) 
+            || (obj1 instanceof SpriteT && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteT) 
+            || (obj1 instanceof SpriteM && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof SpriteM) 
+            || (obj1 instanceof SpriteM && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteM) 
+            || (obj1 instanceof SpriteD && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteD)
+            // Big Object
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteMB && obj2 instanceof SpriteTB) 
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof SpriteTB) 
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof SpriteTB) 
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof SpriteMB) 
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof SpriteMB) 
+            || (obj1 instanceof SpriteDB && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof SpriteDB)
+            // Big To Normal
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof SpriteTB) 
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof SpriteTB) 
+            || (obj1 instanceof SpriteTB && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteTB) 
+
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof SpriteMB) 
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof SpriteMB) 
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteMB) 
+
+            || (obj1 instanceof SpriteVB && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof SpriteVB) 
+            || (obj1 instanceof SpriteVB && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof SpriteVB) 
+            || (obj1 instanceof SpriteVB && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof SpriteVB) 
+
+            || (obj1 instanceof SpriteDB && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof SpriteDB) 
+            || (obj1 instanceof SpriteDB && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof SpriteDB) 
+            || (obj1 instanceof SpriteDB && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof SpriteDB) 
+            // Same Type
+            || (obj1 instanceof Bone && obj2 instanceof Bone) || (obj1 instanceof Avocado && obj2 instanceof Avocado) || (obj1 instanceof Bomb && obj2 instanceof Bomb)
+            // Bone To Normal and Big Object
+            || (obj1 instanceof Bone && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteTB) || (obj1 instanceof SpriteTB && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof Bone)
+            || (obj1 instanceof Bone && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteMB && obj2 instanceof Bone)
+            // Avocado To Big Object and Speacial Ability Object
+            || (obj1 instanceof Avocado && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteMB && obj2 instanceof Avocado)
+            || (obj1 instanceof Avocado && obj2 instanceof SpriteTB) || (obj1 instanceof SpriteTB && obj2 instanceof Avocado)
+            || (obj1 instanceof Avocado && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof Avocado)
+            || (obj1 instanceof Avocado && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof Avocado)
+            || (obj1 instanceof Avocado && obj2 instanceof Bone) || (obj1 instanceof Bone && obj2 instanceof Avocado)
+            || (obj1 instanceof Avocado && obj2 instanceof Bomb) || (obj1 instanceof Bomb && obj2 instanceof Avocado)
+        
+        ) 
+            {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+
+                    // No removal of objects and no score change for Sprite-Circle collision
+                }
+            }
+            // Handle Bomb To Normal Object Collision
+            else if ((obj1 instanceof Bomb && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof Bomb) 
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof Bomb) 
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof Bomb) 
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof Bomb)) 
+            {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 2;
+
+                    bombValue = 0;
+                
+                    // Update score and timer
+                    if (score > 1000) {
+                        score += 40;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    } else if (score > 500) {
+                        score += 30;
+                        if (time > 1) {
+                            time -= 1;
+                        }
+                    } else {
+                        score += 20;
+                        if (time > 1) {
+                            time -= 1;
+                        }
+                    }
+
+                    // Restart the timer
+                    startTimer();
+                    
+                }
+            }
+            // Handle Bomb To Bone collision
+            else if ((obj1 instanceof Bomb && obj2 instanceof Bone) || (obj1 instanceof Bone && obj2 instanceof Bomb)) 
+            {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 2;
+
+                    bombValue = 0;
+                
+                        score += 100;
+                        if (time > 1) {
+                            time -= 3;
+                        }
+
+                    // Restart the timer
+                    startTimer();
+                    
+                }
+            }
+
+            // Handle Same Normal object collision
+            else if ((obj1 instanceof SpriteD && obj2 instanceof SpriteD) || (obj1 instanceof SpriteT && obj2 instanceof SpriteT)
+                || (obj1 instanceof SpriteM && obj2 instanceof SpriteM) || (obj1 instanceof SpriteV && obj2 instanceof SpriteV))
+             {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 2;
+                
+                    if (bombValue < 4) {
+                    bombValue += 1;
+                    }
+                    // Update score and timer
+                    if (score > 1000) {
+                        score += 20;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    } else if (score > 500) {
+                        score += 15;
+                        if (time > 1) {
+                            time -= 1;
+                        }
+                    } else {
+                        score += 10;
+                        if (time > 1) {
+                            time -= 1;
+                        }
+                    }
+
+                    // Restart the timer
+                    startTimer();
+                }
+            }
+            // Handle Avocado To Normal Object Collision (Remove Both and Create Big Object)
+            else if ((obj1 instanceof Avocado && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof Avocado)
+                || (obj1 instanceof Avocado && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof Avocado)
+                || (obj1 instanceof Avocado && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof Avocado)
+                || (obj1 instanceof Avocado && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof Avocado))
+             {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+
+                    // // Calculate position and size for the new object
+                    let newX = (obj1.x + obj2.x) / 2;
+                    let newY = (obj1.y + obj2.y) / 2;
+                    let newRadius = 60;
+
+                    // // Create new object of the same type but bigger
+                    let newObj;
+                    if ((obj1 instanceof Avocado && obj2 instanceof SpriteD) || (obj1 instanceof SpriteD && obj2 instanceof Avocado)) newObj = new SpriteDB(newX, newY, 0, 100, restitution, newRadius);
+                    if ((obj1 instanceof Avocado && obj2 instanceof SpriteT) || (obj1 instanceof SpriteT && obj2 instanceof Avocado)) newObj = new SpriteTB(newX, newY, 0, 100, restitution, newRadius);
+                    if ((obj1 instanceof Avocado && obj2 instanceof SpriteM) || (obj1 instanceof SpriteM && obj2 instanceof Avocado)) newObj = new SpriteMB(newX, newY, 0, 100, restitution, newRadius);
+                    if ((obj1 instanceof Avocado && obj2 instanceof SpriteV) || (obj1 instanceof SpriteV && obj2 instanceof Avocado)) newObj = new SpriteVB(newX, newY, 0, 100, restitution, newRadius);
+               
+                    // // Add new object to the gameObjects array
+                    gameObjects.push(newObj);
+
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 1;
+                
+                    if (bombValue < 4) {
+                    bombValue += 1;
+                    }
+                    // Restart the timer
+                    startTimer();
+                }
+            }
+            // Handle Same Type Normal Object To Big Object Collision
+            else if ((obj1 instanceof SpriteD && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof SpriteD)
+                || (obj1 instanceof SpriteM && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteMB && obj2 instanceof SpriteM)
+                || (obj1 instanceof SpriteT && obj2 instanceof SpriteTB) || (obj1 instanceof SpriteTB && obj2 instanceof SpriteT)
+                || (obj1 instanceof SpriteV && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof SpriteV))
+                {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 2;
+                
+                    if (bombValue < 4) {
+                    bombValue += 1;
+                    }
+                    // Update score and timer
+                    if (score > 1000) {
+                        score += 90;
+                        if (time > 1) {
+                            time -= 3;
+                        }
+                    } else if (score > 500) {
+                        score += 70;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    } else {
+                        score += 50;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    }
+
+                    // Restart the timer
+                    startTimer();
+                }
+            }
+
+            // Handle Same Type Big object collision (Remove objects, spawn bomb)
+            else if ((obj1 instanceof SpriteDB && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteTB && obj2 instanceof SpriteTB)
+            || (obj1 instanceof SpriteMB && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteVB && obj2 instanceof SpriteVB))
+             {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+  
+                    // // Calculate position and size for the new object
+                    let newX = (obj1.x + obj2.x) / 2;
+                    let newY = (obj1.y + obj2.y) / 2;
+
+                    // // Create new object of the same type
+                    let newObj;
+                    if ((obj1 instanceof SpriteDB && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteTB && obj2 instanceof SpriteTB)
+                    || (obj1 instanceof SpriteMB && obj2 instanceof SpriteMB) 
+                    || (obj1 instanceof SpriteVB && obj2 instanceof SpriteVB)) newObj = new Bomb(newX, newY, 0, 100, restitution, 40);
+               
+                    // // Add new object to the gameObjects array
+                    gameObjects.push(newObj);
+
+
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 1;
+                
+                    if (bombValue < 4) {
+                    bombValue += 1;
+                    }
+                    // Update score and timer
+                    if (score > 1000) {
+                        score += 200;
+                        if (time > 1) {
+                            time -= 4;
+                        }
+                    } else if (score > 500) {
+                        score += 150;
+                        if (time > 1) {
+                            time -= 3;
+                        }
+                    } else {
+                        score += 120;
+                        if (time > 1) {
+                            time -= 3;
+                        }
+                    }
+
+                    // Restart the timer
+                    startTimer();
+                }
+            }
+            // Handle Bomb To Big Object
+            else if ((obj1 instanceof Bomb && obj2 instanceof SpriteDB) || (obj1 instanceof SpriteDB && obj2 instanceof Bomb)
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteVB) || (obj1 instanceof SpriteVB && obj2 instanceof Bomb)
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteTB) || (obj1 instanceof SpriteTB && obj2 instanceof Bomb)
+            || (obj1 instanceof Bomb && obj2 instanceof SpriteMB) || (obj1 instanceof SpriteMB && obj2 instanceof Bomb))
+            {
+                if (circleIntersect(obj1.x, obj1.y, obj1.radius, obj2.x, obj2.y, obj2.radius)) {
+                    obj1.isColliding = true;
+                    obj2.isColliding = true;
+                    resolveCollision(obj1, obj2);
+                    collisionSound.play();
+  
+                    // Remove both original objects
+                    gameObjects.splice(j, 1); // Remove second object first
+                    gameObjects.splice(i, 1); // Then remove the first one
+                    objectCount -= 2;
+                
+                    if (bombValue < 4) {
+                    bombValue += 1;
+                    }
+                    // Update score and timer
+                    if (score > 1000) {
+                        score += 140;
+                        if (time > 1) {
+                            time -= 3;
+                        }
+                    } else if (score > 500) {
+                        score += 120;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    } else {
+                        score += 100;
+                        if (time > 1) {
+                            time -= 2;
+                        }
+                    }
+
+                    // Restart the timer
+                    startTimer();
+                }
+            }
+        }
+    }
+}
+
+
+
+
+        // function rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+        //     return !(x2 > x1 + w1 || x1 > x2 + w2 || y2 > y1 + h1 || y1 > y2 + h2);
+        // }
+
+        function circleIntersect(x1, y1, r1, x2, y2, r2) {
+            let squareDistance = (x1 - x2) ** 2 + (y1 - y2) ** 2;
+            return squareDistance <= (r1 + r2) ** 2;
+        }
+
+        // function circleSquareIntersect(circle, square) {
+        //     let distX = Math.abs(circle.x - square.x - square.width / 2);
+        //     let distY = Math.abs(circle.y - square.y - square.height / 2);
+
+        //     if (distX > (square.width / 2 + circle.radius)) return false;
+        //     if (distY > (square.height / 2 + circle.radius)) return false;
+        //     if (distX <= (square.width / 2)) return true;
+        //     if (distY <= (square.height / 2)) return true;
+
+        //     let dx = distX - square.width / 2;
+        //     let dy = distY - square.height / 2;
+        //     return (dx ** 2 + dy ** 2 <= circle.radius ** 2);
+        // }
+
+        function resolveCollision(obj1, obj2) {
+            let vCollision = { x: obj2.x - obj1.x, y: obj2.y - obj1.y };
+            let distance = Math.sqrt(vCollision.x ** 2 + vCollision.y ** 2);
+            let vCollisionNorm = { x: vCollision.x / distance, y: vCollision.y / distance };
+            let vRelativeVelocity = { x: obj1.vx - obj2.vx, y: obj1.vy - obj2.vy };
+            let speed = vRelativeVelocity.x * vCollisionNorm.x + vRelativeVelocity.y * vCollisionNorm.y;
+
+            if (speed < 0) return;
+
+            speed *= Math.min(obj1.restitution, obj2.restitution);
+            let impulse = 2 * speed / (1 + 1);
+            obj1.vx -= impulse * vCollisionNorm.x;
+            obj1.vy -= impulse * vCollisionNorm.y;
+            obj2.vx += impulse * vCollisionNorm.x;
+            obj2.vy += impulse * vCollisionNorm.y;
+        }
+
+        function detectEdgeCollisions(obj) {
+            if (obj instanceof SpriteVB ||obj instanceof SpriteTB ||obj instanceof SpriteMB ||obj instanceof SpriteDB 
+            ||obj instanceof Bone ||obj instanceof Avocado ||obj instanceof Bomb ||obj instanceof SpriteD|| obj instanceof SpriteV 
+            || obj instanceof SpriteM || obj instanceof SpriteT) {
+                if (obj.x < obj.radius) {
+                    obj.vx = Math.abs(obj.vx) * obj.restitution;
+                    obj.x = obj.radius;
+                } else if (obj.x > canvas.width - obj.radius) {
+                    obj.vx = -Math.abs(obj.vx) * obj.restitution;
+                    obj.x = canvas.width - obj.radius;
+                }
+                if (obj.y < obj.radius) {
+                    obj.vy = Math.abs(obj.vy) * obj.restitution;
+                    obj.y = obj.radius;
+                } else if (obj.y > canvas.height - obj.radius) {
+                    obj.vy = -Math.abs(obj.vy) * obj.restitution;
+                    obj.y = canvas.height - obj.radius;
+                }
+            // } else if (obj instanceof Square) {
+            //     if (obj.x < 0) {
+            //         obj.vx = Math.abs(obj.vx) * obj.restitution;
+            //         obj.x = 0;
+            //     } else if (obj.x + obj.width > canvas.width) {
+            //         obj.vx = -Math.abs(obj.vx) * obj.restitution;
+            //         obj.x = canvas.width - obj.width;
+            //     }
+            //     if (obj.y < 0) {
+            //         obj.vy = Math.abs(obj.vy) * obj.restitution;
+            //         obj.y = 0;
+            //     } else if (obj.y + obj.height > canvas.height) {
+            //         obj.vy = -Math.abs(obj.vy) * obj.restitution;
+            //         obj.y = canvas.height - obj.height;
+            //     }
+             }
+        }
+
+
+let isIntro = true;   // Flag to track if the intro is being displayed
+let isMenu = false;   // Flag for the menu screen
+let gameStarted = false;
+
+function startGame() {
+
+    resetGame();
+    requestAnimationFrame(gameLoop);
+}
+
+function showIntro() {
+    
+    clearCanvas();
+    const introImage = new Image();
+    introImage.src = './modern-white-background.jpg'; // Add your intro image
+
+    introImage.onload = function() {
+        context.drawImage(introImage, 0, 0, canvas.width, canvas.height);
+        };
+
+    canvas.addEventListener('click', handleIntroClick);
+}
+
+const themeSound = new Audio('./theme.mp3'); 
+themeSound.volume = 0.5; // Adjust volume as needed
+themeSound.loop = true;
+
+function handleIntroClick() {
+    if (isIntro) {
+        isIntro = false;
+        isMenu = true;
+        canvas.removeEventListener('click', handleIntroClick);
+        showMenu();       
+        themeSound.play();
+    }
+}
+
+function showMenu() {
+    clearCanvas();
+    const menuImage = new Image();
+    menuImage.src = './menu-background.png'; // Add your intro image
+
+    
+    menuImage.onload = function() {
+    context.drawImage(menuImage, 0, 0, canvas.width, canvas.height);
+    context.font = '40px Comic Sans MS';
+    context.fillStyle = 'black';
+    context.fillText('DINO CHASE', 65, 300);
+    
+    // Draw "Start Game" Button
+    context.font = '18px Comic Sans MS';
+    context.fillStyle = 'red';
+    context.strokeStyle = 'black';
+    const startButtonX = canvas.width / 2 - 60;
+    const startButtonY = canvas.height / 2 - 20;
+    context.fillRect(startButtonX, startButtonY, 120, 50);
+    context.strokeRect(startButtonX, startButtonY, 120, 50);
+    context.fillStyle = 'white';
+    context.fillText('Start Game', startButtonX + 10, startButtonY + 30);
+
+    // Draw "Instructions" Button
+    context.font = '18px Comic Sans MS';
+    context.fillStyle = 'red';
+    context.strokeStyle = 'black';
+    const instructionsButtonX = canvas.width / 2 - 60;
+    const instructionsButtonY = canvas.height / 2 + 50;
+    context.strokeRect(instructionsButtonX, instructionsButtonY, 120, 50);
+    context.fillRect(instructionsButtonX, instructionsButtonY, 120, 50);
+    context.fillStyle = 'white';
+    context.fillText('Instructions', instructionsButtonX + 10, instructionsButtonY + 30);
+
+    
+    };
+
+    canvas.addEventListener('click', handleMenuClick);
+}
+
+function handleMenuClick(event) {
+    const mouseX = event.clientX - canvas.getBoundingClientRect().left;
+    const mouseY = event.clientY - canvas.getBoundingClientRect().top;
+
+    const startButtonX = canvas.width / 2 - 60;
+    const startButtonY = canvas.height / 2 - 20;
+    const instructionsButtonX = canvas.width / 2 - 60;
+    const instructionsButtonY = canvas.height / 2 + 50;
+
+    if (mouseX >= startButtonX && mouseX <= startButtonX + 120 &&
+        mouseY >= startButtonY && mouseY <= startButtonY + 50) {
+        // Start the game
+        isMenu = false;
+        gameStarted = true;
+        canvas.removeEventListener('click', handleMenuClick);
+        themeSound.pause();
+        themeSound.currentTime = 0;
+        startGame();
+    } else if (mouseX >= instructionsButtonX && mouseX <= instructionsButtonX + 120 &&
+               mouseY >= instructionsButtonY && mouseY <= instructionsButtonY + 50) {
+        // Show instructions
+        showInstructions();
+    }
+}
+
+function showInstructions() {
+    clearCanvas();
+    const insImage = new Image();
+    insImage.src = './menu-background.png'; // Add your intro image
+    
+    insImage.onload = function() {
+        context.drawImage(insImage, 0, 0, canvas.width, canvas.height);
+        context.font = '15px Comic Sans MS';
+        context.fillStyle = 'black';
+        context.fillText('Instructions:', 30, 200);
+        context.fillText('1. Use Up-Dowm to change type of the dino', 30, 220);
+        context.fillText('special ability (Right-Bomb and Left-Avocado).', 30, 240);
+        context.fillText('2. Click to drop the dino, dino with same type', 30, 260);
+        context.fillText('chase to score points, drop bomb to destroy dino.', 30, 280);
+        context.fillText('3. Drop avocado to make dino bigger, chase big dino', 30, 300);
+        context.fillText('will get more ponit, only bomb can chase white dino.', 30, 320);
+        context.fillText('4. Use avocado required 30 score point, each 4 time', 30, 340);
+        context.fillText('get dino chase, you will get 1 bomb to use.', 30, 360);
+        context.fillText('Click to return to menu', 30, 380);
+
+    };
+    
+
+    canvas.addEventListener('click', showMenu);
+}
+
+
+        function gameOver() {
+            isGameOver = true;
+            loopSound.pause();
+            loopSound.currentTime = 0;
+            currentBackgroundImage = backgroundImage;
+            // Check and update high score
+            if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('highScore', highScore); // Save the new high score to localStorage
+            }
+            drawGameOverScreen();
+            canvas.addEventListener('click', handleRestartClick);
+        }
+
+
+function drawGameOverScreen() {
+    clearCanvas();
+
+    const backgroundOver = new Image();
+    backgroundOver.src = './over.jpg';
+
+    // Wait until the image is fully loaded before drawing
+    backgroundOver.onload = function() {
+        // Draw the background image
+        context.drawImage(backgroundOver, 0, 0, canvas.width, canvas.height);
+
+        // Set font and color for the text
+        context.font = '36px Comic Sans MS';
+        context.fillStyle = 'white';
+
+        // Calculate text width and height for the rectangle
+        const gameOverText = 'Game Over';
+        const scoreText = 'Your score: ' + score;
+        const highScoreText = 'High score: ' + highScore;
+        const restartText = 'Click to Restart';
+        const menuText = 'Back to Menu';
+
+        // Measure text sizes
+        const gameOverWidth = context.measureText(gameOverText).width;
+        const scoreWidth = context.measureText(scoreText).width;
+        const highScoreWidth = context.measureText(highScoreText).width;
+        const restartWidth = context.measureText(restartText).width;
+        const menuWidth = context.measureText(menuText).width;
+        const maxWidth = Math.max(gameOverWidth, scoreWidth, highScoreWidth, restartWidth, menuWidth);
+
+        const textHeight = 36; // Font size
+        const padding = 30;
+        const boxWidth = maxWidth + 2 * padding;
+        const boxHeight = (textHeight * 8) + (4 * padding); // 5 lines of text
+
+        const boxX = canvas.width / 2 - boxWidth / 2;
+        const boxY = canvas.height / 2 - boxHeight / 2;
+
+        // Draw the rectangle
+        context.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Semi-transparent background
+        context.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+        // Draw the text
+        context.fillStyle = 'white';
+        context.fillText(gameOverText, canvas.width / 2 - gameOverWidth / 2, canvas.height / 2 - textHeight / 2 - padding + textHeight);
+        context.font = '24px Comic Sans MS';
+        context.fillText(scoreText, canvas.width / 2 - scoreWidth / 2, canvas.height / 2 + textHeight / 2 + padding);
+        context.fillText(highScoreText, canvas.width / 2 - highScoreWidth / 2, canvas.height / 2 + textHeight / 2 + padding * 2);
+
+        // Draw the "Restart" button
+        const restartButtonX = canvas.width / 2 - restartWidth / 2 - 10;
+        const restartButtonY = canvas.height / 2 + textHeight / 2 + padding * 2.8;
+        context.fillStyle = 'red';
+        context.fillRect(restartButtonX, restartButtonY, restartWidth + 20, 30);
+
+        // Draw the "Back to Menu" button
+        const menuButtonX = canvas.width / 2 - menuWidth / 2 - 10;
+        const menuButtonY = canvas.height / 2 + textHeight / 2 + padding * 4.0;
+        context.fillStyle = 'red';
+        context.fillRect(menuButtonX, menuButtonY, menuWidth + 20, 30);
+
+        // Draw the text on top of both buttons
+        context.fillStyle = 'white';
+        context.fillText(restartText, canvas.width / 2 - restartWidth / 2, canvas.height / 2 + textHeight / 2 + padding * 3 + 20);
+        context.fillText(menuText, canvas.width / 2 - menuWidth / 2, canvas.height / 2 + textHeight / 2 + padding * 4.7);
+    };
+}
+
+function handleRestartClick(event) {
+    const mouseX = event.clientX - canvas.getBoundingClientRect().left;
+    const mouseY = event.clientY - canvas.getBoundingClientRect().top;
+
+    const restartButtonX = canvas.width / 2 - context.measureText('Click to Restart').width / 2 - 10;
+    const restartButtonY = canvas.height / 2 + 36 / 2 + 30 * 2.8;
+    const restartButtonWidth = context.measureText('Click to Restart').width + 20;
+    const restartButtonHeight = 30;
+
+    const menuButtonX = canvas.width / 2 - context.measureText('Back to Menu').width / 2 - 10;
+    const menuButtonY = canvas.height / 2 + 36 / 2 + 30 * 4.0;
+    const menuButtonWidth = context.measureText('Back to Menu').width + 20;
+    const menuButtonHeight = 30;
+
+    // Check if the restart button is clicked
+    if (mouseX >= restartButtonX && mouseX <= restartButtonX + restartButtonWidth &&
+        mouseY >= restartButtonY && mouseY <= restartButtonY + restartButtonHeight) {
+        resetGame();
+        requestAnimationFrame(gameLoop); // Restart the game loop
+        canvas.removeEventListener('click', handleRestartClick);
+    }
+
+    // Check if the menu button is clicked
+    else if (mouseX >= menuButtonX && mouseX <= menuButtonX + menuButtonWidth &&
+             mouseY >= menuButtonY && mouseY <= menuButtonY + menuButtonHeight) {
+        isGameOver = false;
+        isIntro = true;
+        canvas.removeEventListener('click', handleRestartClick);
+        showIntro(); // Go back to the menu
+    }
+}
+
+
+
+// Function to create objects in the world, with a customizable number of objects
+function createWorld(numToGenerate = 6) {
+    autoGeneSound.play();
+
+    // Ensure we do not try to generate more objects than available x-positions
+    const numObjectsToAdd = Math.min(numToGenerate, availableXPositions.length);
+
+    for (let i = 0; i < numObjectsToAdd; i++) {
+        addRandomObject();
+    }
+
+    // Log a message if fewer objects were created due to limited x-positions
+    if (numObjectsToAdd < numToGenerate) {
+        console.log(`Only ${numObjectsToAdd} objects were added because x-positions ran out.`);
+    }
+}
+
+// Function to add a random object, ensuring the game doesn't exceed the max number of objects
+
+function addBone() {
+    if (objectCount >= maxObjects) {
+        gameOver();
+        return;
+    }
+
+    const objectSize = 40; // Fixed size of each object
+    const xPositions = [
+        60, 120, 180, 240, 300, 360
+    ]; // Predefined x positions
+
+    const vx = 0; // Horizontal velocity
+    const vy = 100; // Vertical velocity
+
+    // Random x-position from the predefined set
+    const randomIndex = Math.floor(Math.random() * xPositions.length);
+    const x = xPositions[randomIndex];
+    const y = 40; // Fixed y-position (starting point)
+
+    // Add a new Bone object to the gameObjects array
+    const bone = new Bone(x, y, vx, vy, restitution, objectSize);
+
+    // Push the object to the gameObjects array and increment the count
+    gameObjects.push(bone);
+    objectCount++;
+}
+
+
+// List of available x positions (global or outside the function)
+let availableXPositions = [50, 100, 150, 200, 250, 300, 350];
+
+function resetAvailableXPositions() {
+    availableXPositions = [50, 100, 150, 200, 250, 300, 350];
+}
+
+function addRandomObject() {
+    if (objectCount >= maxObjects) {
+        gameOver();
+        return;
+    }
+
+    if (availableXPositions.length === 0) {
+        console.log('No more x-positions available!');
+        return;
+    }
+
+    const objectSize = 40; // Fixed size for all objects
+    const y = 40; // Fixed y-position (starting point)
+
+    const vx = 0; // Horizontal speed (velocity)
+    const vy = 100; // Fixed vertical speed
+
+    // Select a random x position from the available list
+    const randomXIndex = Math.floor(Math.random() * availableXPositions.length);
+    const x = availableXPositions[randomXIndex];
+
+    // Define the sprite constructors
+    const sprites = [
+        () => new SpriteT(x, y, vx, vy, restitution, objectSize),
+        () => new SpriteV(x, y, vx, vy, restitution, objectSize),
+        () => new SpriteD(x, y, vx, vy, restitution, objectSize),
+        () => new SpriteM(x, y, vx, vy, restitution, objectSize)
+    ];
+
+    // Pick a random sprite constructor
+    const randomSpriteIndex = Math.floor(Math.random() * sprites.length);
+    const newObject = sprites[randomSpriteIndex]();
+
+    // Add the new object to the gameObjects array
+    gameObjects.push(newObject);
+
+    // Remove the used x-position from the available list
+    availableXPositions.splice(randomXIndex, 1);
+
+    // Increment the object count
+    objectCount++;
+}
+
+
+
+let isAutoGenerating = false;  // Add this flag globally
+let autoGenerateIntervalId = null;
+function startAutoGenerate() {
+    if (isAutoGenerating) return;  // Prevent multiple calls
+
+    isAutoGenerating = true;  // Set the flag to true when auto-generation starts
+
+    if (autoGenerateIntervalId !== null) {
+        clearInterval(autoGenerateIntervalId);
+        autoGenerateIntervalId = null;
+    }
+
+    console.log("Starting auto-generation...");
+    autoGenerateIntervalId = setInterval(() => {
+        if (score >= 1000 && !isGameOver && objectCount < maxObjects) {
+            console.log("Auto-generating random object.");
+            addRandomObject();
+        }
+    }, 3000);
+}
+
+let isAutoGeneratingBone = false;  // Add this flag globally
+let autoGenerateIntervalBoneId = null;
+function startAutoGenerateBone() {
+    if (isAutoGeneratingBone) return;  // Prevent multiple calls
+
+    isAutoGeneratingBone = true;  // Set the flag to true when auto-generation starts
+
+    if (autoGenerateIntervalBoneId !== null) {
+        clearInterval(autoGenerateIntervalBoneId);
+        autoGenerateIntervalBoneId = null;
+    }
+
+    console.log("Starting auto-generation bone...");
+    autoGenerateIntervalBoneId = setInterval(() => {
+        if (score >= 500 && !isGameOver && objectCount < maxObjects) {
+            console.log("Auto-generating bone.");
+            addBone();
+        }
+    }, 10000);
+}
+
+
+function resetGame() {
+    
+    isGameOver = false;
+    score = 0;
+    bombValue = 0;
+    objectCount = 0;
+    time = 0;
+    gameObjects = [];
+    isAutoGenerating = false;
+    autoGenerateIntervalId = null;
+    autoGenerateIntervalBoneId = null;
+    canvas.removeEventListener('click', handleRestartClick); // Remove the game-over listener
+    clearCanvas();
+    createWorld();
+    startTimer();
+}
+
+
+let timerIntervalId = null; // Variable to store the interval ID
+
+function startTimer() {
+    // Clear any existing interval
+    if (timerIntervalId !== null) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null; // Ensure the interval ID is reset
+    }
+
+    // Determine the interval time based on the score
+    let intervalTime;
+    if (score > 1000) {
+        intervalTime = 500; // 500 milliseconds if score > 2000
+    } else if (score > 500) {
+        intervalTime = 1000; // 750 milliseconds if score > 1000
+    } else {
+        intervalTime = 1500; // 1500 milliseconds if score <= 1000
+    }
+    
+    console.log(`Score: ${score}, Setting timer interval to ${intervalTime} milliseconds.`);
+
+    // Start a new interval
+    timerIntervalId = setInterval(() => {
+        if (!isGameOver) {
+            time++;
+            console.log(`Time updated: ${time}`);
+        }
+    }, intervalTime); // Update based on score
+}
+
+const dinoImages = {
+    'dinoT': yellowDinoImage,  
+    'dinoV': greenDinoImage,   
+    'dinoD': blueDinoImage,    
+    'dinoM': redDinoImage,  
+    'avocado': avocadoImage,   
+    'bomb': bombImage
+};
+let currentFrame = 0;
+const frameWidth = 24; 
+const frameHeight = 24; 
+const totalFrames = 24; 
+const frameWidthAvocado = 16; 
+const frameHeightAvocado = 16; 
+const totalAvocadoFrames = 1;
+let animationSpeed = 100; 
+let lastUpdateTime = 0;
+
+
+function gameLoop(timeStamp) {
+    loopSound.play();
+    if (isGameOver) return;
+
+    let secondsPassed = (timeStamp - oldTimeStamp) / 1000;
+    oldTimeStamp = timeStamp;
+    clearCanvas();
+
+    // Background based on score
+    if (score >= 1000) {
+        currentBackgroundImage = backgroundImage3;
+        startAutoGenerate();
+    } else if (score >= 500) {
+        currentBackgroundImage = backgroundImage2;
+        startAutoGenerateBone();
+    }
+
+    context.drawImage(currentBackgroundImage, 0, 0, canvas.width, canvas.height);
+    detectCollisions();
+    // Update and draw all game objects
+    for (let i = 0; i < gameObjects.length; i++) {
+        gameObjects[i].update(secondsPassed);
+        gameObjects[i].draw(context);
+    }
+
+    context.fillStyle = 'black';
+    context.font = '20px Comic Sans MS';
+    context.fillText('Score: ' + score, 10, 30);
+    context.fillText('Time Left: ' + (40 - time), 10, 80);
+    context.fillText('Dino left: ' + (maxObjects - objectCount), 10, 60);
+    context.fillText(text, 310,25);
+
+    // Draw the bombAVImage
+    if (bombValue == 0) { // Change condition based on your logic
+    context.drawImage(bombAVImageA, 200, 20, 40, 40);
+    } else if (bombValue == 1) { // Change condition based on your logic
+    context.drawImage(bombAVImageB, 200, 20, 40, 40);
+    } else if (bombValue == 2) { // Change condition based on your logic
+    context.drawImage(bombAVImageC, 200, 20, 40, 40);
+    } else if (bombValue == 3) { // Change condition based on your logic
+    context.drawImage(bombAVImageD, 200, 20, 40, 40);
+    } else if (bombValue >= 4) { // Change condition based on your logic
+    context.drawImage(bombAVImageE, 200, 20, 40, 40);
+    } 
+
+    // Draw the current dino type animation
+    if (selectedObjectType && dinoImages[selectedObjectType]) {
+        
+        if (selectedObjectType === 'avocado')
+        {
+        let dinoImg = dinoImages[selectedObjectType];
+        // Update frame if enough time has passed
+        if (timeStamp - lastUpdateTime > animationSpeed) {
+            currentFrame = (currentFrame + 1) % totalAvocadoFrames; // Loop the frame index
+            lastUpdateTime = timeStamp;
+        }
+
+        // Calculate the x position of the current frame in the spritesheet
+        let frameX = currentFrame * frameWidthAvocado;
+
+        // Draw the current frame from the spritesheet
+        context.drawImage(dinoImg, frameX, 0, frameWidthAvocado, frameHeightAvocado, 330, 30, 32, 32);
+   
+        } else {
+        let dinoImg = dinoImages[selectedObjectType];
+        // Update frame if enough time has passed
+        if (timeStamp - lastUpdateTime > animationSpeed) {
+            currentFrame = (currentFrame + 1) % totalFrames; // Loop the frame index
+            lastUpdateTime = timeStamp;
+        }
+
+        // Calculate the x position of the current frame in the spritesheet
+        let frameX = currentFrame * frameWidth;
+
+        // Draw the current frame from the spritesheet
+        context.drawImage(dinoImg, frameX, 0, frameWidth, frameHeight, 300, 20, 65, 65);
+    }
+    }
+
+    // Game-over conditions
+    if (objectCount > maxObjects || time > 40) {
+        gameOver();
+        return;
+    }
+
+    // Regenerate the world if all objects are gone
+    if (objectCount <= 1  && !isGameOver) {
+        resetAvailableXPositions();
+        createWorld();
+    }
+
+    window.requestAnimationFrame(gameLoop);
+}
+
+showIntro();
+
+    </script>
+</body>
+</html>
